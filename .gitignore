@@ -4,5 +4,6 @@
 *.dylib
 
 *.test
-./vender/github.com/*
+vendor/*
+!vendor/vendor.json
 .idea/
