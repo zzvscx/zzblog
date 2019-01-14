@@ -2,18 +2,21 @@ package routers
 
 import (
 	"github.com/gin-gonic/gin"
+	"html/template"
 	"zzblog/pkg/setting"
+	"zzblog/pkg/utils"
 	"zzblog/views"
 )
 
 func InitRouter() *gin.Engine {
 	r := gin.New()
-	r.LoadHTMLGlob("template/**/*")
+	setTemplate(r)
 	r.Static("/static", "./static")
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	gin.SetMode(setting.RunMode)
 
+	r.GET("/", views.IndexGet)
 	post := r.Group("/post")
 	{
 		post.GET("/", views.PostIndex)
@@ -38,4 +41,15 @@ func InitRouter() *gin.Engine {
 		tag.POST("/new", views.TagCreate)
 	}
 	return r
+}
+
+func setTemplate(r *gin.Engine) {
+	funcMap := template.FuncMap{
+		"dateFormat": utils.DateFormat,
+		"substring":  utils.Substring,
+		"isOdd":      utils.IsOdd,
+		"isEven":     utils.IsEven,
+	}
+	r.FuncMap = funcMap
+	r.LoadHTMLGlob("template/**/*")
 }

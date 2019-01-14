@@ -26,9 +26,9 @@ func TagGet(c *gin.Context) {
 	posts, err := models.ListPostByTagId(id)
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
-	} else {
-		c.HTML(http.StatusOK, "", gin.H{
-			"posts": posts,
-		})
 	}
+
+	c.HTML(http.StatusOK, "index/index.html", gin.H{
+		"posts": posts,
+	})
 }

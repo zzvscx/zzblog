@@ -6,6 +6,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"log"
 	"strconv"
+	"time"
 	"zzblog/pkg/setting"
 )
 
@@ -51,6 +52,7 @@ func CloseDB() {
 
 type Page struct {
 	gorm.Model
+	Title       string //title
 	Body        string // body
 	View        int    //view count
 	IsPublished string // published or not
@@ -59,18 +61,25 @@ type Page struct {
 // table posts
 type Post struct {
 	gorm.Model
-	Title string //title
-	Body  string //body
-	View  int    //view count
-	Tags  []Tag  `gorm:"many2many:post_tags;"`
+	Title       string //title
+	Body        string //body
+	View        int    //view count
+	IsPublished string // published or not
+	Tags        []Tag  `gorm:"many2many:post_tags;"`
 }
 
 // table tags
 type Tag struct {
 	gorm.Model
 	Name  string // post id
-	Posts []Post `gorm:"many2many:post_tags;"`
 	Total int    `gorm:"-"`
+}
+
+type QrArchive struct {
+	ArchiveDate time.Time
+	Total       int
+	Year        int
+	Month       int
 }
 
 func (page *Page) Insert() error {
@@ -78,7 +87,7 @@ func (page *Page) Insert() error {
 }
 
 func (page *Page) Update() error {
-	return db.Model(page).Update(Page{Body: page.Body, IsPublished: page.IsPublished}).Error
+	return db.Model(page).Update(Page{Title: page.Title, Body: page.Body, IsPublished: page.IsPublished}).Error
 }
 
 func (page *Page) Delete() error {
@@ -97,7 +106,7 @@ func GetPageById(id string) (*Page, error) {
 
 func ListPage() ([]*Page, error) {
 	var pages []*Page
-	err := db.First(pages).Error
+	err := db.Related("Tags").Find(pages).Error
 	return pages, err
 }
 
@@ -118,7 +127,7 @@ func (post *Post) Delete() error {
 func ListPostByTagId(id string) ([]*Post, error) {
 	var posts []*Post
 	if len(id) == 0 {
-		err := db.First(&posts).Error
+		err := db.Find(&posts).Error
 		return posts, err
 	} else {
 		tid, err := strconv.ParseUint(id, 10, 64)
@@ -151,8 +160,20 @@ func (tag *Tag) Insert() error {
 
 func ListTag() ([]*Tag, error) {
 	var tags []*Tag
-	err := db.Find(&tags).Error
-	return tags, err
+	rows, err := db.Raw("select t.id, t.name, count(*) from tag t inner join post_tags pt on t.id=pt.tag_id " +
+		"inner join post p on pt.post_id=p.id group by pt.tag_id").Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var tag Tag
+		rows.Scan(&tag.ID, &tag.Name, &tag.Total)
+		fmt.Printf("%#v", tag)
+		tags = append(tags, &tag)
+	}
+
+	return tags, nil
 }
 
 func ListTagByPostId(id string) ([]*Tag, error) {
@@ -168,4 +189,45 @@ func ListTagByPostId(id string) ([]*Tag, error) {
 	}
 	err = db.Model(&post).Related(&tags, "Tags").Error
 	return tags, err
+}
+
+func PostCountByArchives() ([]*QrArchive, error) {
+	var archives []*QrArchive
+	sql := `select DATE_FORMAT(created_at,'%Y-%m') as month, count(*) as total from post group by month order by month desc`
+	rows, err := db.Raw(sql).Rows()
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	for rows.Next() {
+		var archive QrArchive
+		var month string
+		rows.Scan(&month, &archive.Total)
+		archive.ArchiveDate, _ = time.Parse("2006-01", month)
+		archive.Year = archive.ArchiveDate.Year()
+		archive.Month = archive.ArchiveDate.Minute()
+		archives = append(archives, &archive)
+	}
+	return archives, nil
+
+}
+
+func ListPostByArchive(year, month string) ([]*Post, error) {
+	if len(month) == 1 {
+		month = "0" + month
+	}
+	condition := fmt.Sprintf("%s-%s", year, month)
+	rows, err := db.Raw("select * from posts where data_format(created_at,'%Y-%m') = ?", condition).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	posts := make([]*Post, 0)
+	for rows.Next() {
+		var post Post
+		db.ScanRows(rows, &post)
+		posts = append(posts, &post)
+	}
+	return posts, nil
 }
