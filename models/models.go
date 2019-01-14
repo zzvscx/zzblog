@@ -49,6 +49,13 @@ func CloseDB() {
 	db.Close()
 }
 
+type Page struct {
+	gorm.Model
+	Body        string // body
+	View        int    //view count
+	IsPublished string // published or not
+}
+
 // table posts
 type Post struct {
 	gorm.Model
@@ -64,6 +71,34 @@ type Tag struct {
 	Name  string // post id
 	Posts []Post `gorm:"many2many:post_tags;"`
 	Total int    `gorm:"-"`
+}
+
+func (page *Page) Insert() error {
+	return db.Create(page).Error
+}
+
+func (page *Page) Update() error {
+	return db.Model(page).Update(Page{Body: page.Body, IsPublished: page.IsPublished}).Error
+}
+
+func (page *Page) Delete() error {
+	return db.Delete(page).Error
+}
+
+func GetPageById(id string) (*Page, error) {
+	pid, err := strconv.ParseUint(id, 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	var page Page
+	err = db.First(&page, "id=?", pid).Error
+	return &page, err
+}
+
+func ListPage() ([]*Page, error) {
+	var pages []*Page
+	err := db.First(pages).Error
+	return pages, err
 }
 
 func (post *Post) Insert() error {
@@ -83,7 +118,7 @@ func (post *Post) Delete() error {
 func ListPostByTagId(id string) ([]*Post, error) {
 	var posts []*Post
 	if len(id) == 0 {
-		err := db.First(posts).Error
+		err := db.First(&posts).Error
 		return posts, err
 	} else {
 		tid, err := strconv.ParseUint(id, 10, 64)

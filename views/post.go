@@ -19,10 +19,7 @@ func PostGet(c *gin.Context) {
 }
 
 func PostNew(c *gin.Context) {
-	c.HTML(http.StatusOK, "", nil)
-	//c.JSON(http.StatusOK, gin.H{
-	//	"data": "123",
-	//})
+	c.HTML(http.StatusOK, "post/new.html", nil)
 }
 
 func PostCreate(c *gin.Context) {
