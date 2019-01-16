@@ -43,7 +43,7 @@ func Setup() {
 	db.SingularTable(true)
 	db.DB().SetMaxIdleConns(10)
 	db.DB().SetMaxOpenConns(100)
-	db.AutoMigrate(&Tag{}, &Post{})
+	db.AutoMigrate(&Tag{}, &Page{}, &Post{}, &User{})
 }
 
 func CloseDB() {
@@ -65,14 +65,15 @@ type Post struct {
 	Body        string //body
 	View        int    //view count
 	IsPublished string // published or not
-	Tags        []Tag  `gorm:"many2many:post_tags;"`
+	Tags        []*Tag `gorm:"many2many:post_tags;"`
 }
 
 // table tags
 type Tag struct {
 	gorm.Model
-	Name  string // post id
-	Total int    `gorm:"-"`
+	Name  string  // post id
+	Total int     `gorm:"-"`
+	Posts []*Post `gorm:"many2many:post_tags;"`
 }
 
 type QrArchive struct {
@@ -80,6 +81,14 @@ type QrArchive struct {
 	Total       int
 	Year        int
 	Month       int
+}
+
+type User struct {
+	gorm.Model
+	Email       string `gorm:"unique_index"` //邮箱
+	Password    string //密码
+	VerifyState string //邮箱验证状态
+	IsAdmin     bool   //是否是管理员
 }
 
 func (page *Page) Insert() error {
@@ -139,6 +148,7 @@ func ListPostByTagId(id string) ([]*Post, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		err = db.Model(&tag).Related(&posts, "Posts").Error
 		return posts, err
 	}
@@ -169,7 +179,6 @@ func ListTag() ([]*Tag, error) {
 	for rows.Next() {
 		var tag Tag
 		rows.Scan(&tag.ID, &tag.Name, &tag.Total)
-		fmt.Printf("%#v", tag)
 		tags = append(tags, &tag)
 	}
 
@@ -206,7 +215,7 @@ func PostCountByArchives() ([]*QrArchive, error) {
 		rows.Scan(&month, &archive.Total)
 		archive.ArchiveDate, _ = time.Parse("2006-01", month)
 		archive.Year = archive.ArchiveDate.Year()
-		archive.Month = archive.ArchiveDate.Minute()
+		archive.Month = int(archive.ArchiveDate.Month())
 		archives = append(archives, &archive)
 	}
 	return archives, nil
@@ -218,7 +227,7 @@ func ListPostByArchive(year, month string) ([]*Post, error) {
 		month = "0" + month
 	}
 	condition := fmt.Sprintf("%s-%s", year, month)
-	rows, err := db.Raw("select * from posts where data_format(created_at,'%Y-%m') = ?", condition).Rows()
+	rows, err := db.Raw("select title,body from post where date_format(created_at,'%Y-%m') = ?", condition).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -226,8 +235,22 @@ func ListPostByArchive(year, month string) ([]*Post, error) {
 	posts := make([]*Post, 0)
 	for rows.Next() {
 		var post Post
-		db.ScanRows(rows, &post)
+		rows.Scan(&post.Title, &post.Body)
 		posts = append(posts, &post)
 	}
 	return posts, nil
+}
+
+func (user *User) Insert() error {
+	return db.Create(user).Error
+}
+
+func (user *User) Update() error {
+	return db.Save(user).Error
+}
+
+func GetUserByUsername(username string) (*User, error) {
+	var user User
+	err := db.First(&user, "email = ?", username).Error
+	return &user, err
 }

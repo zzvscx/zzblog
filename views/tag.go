@@ -27,8 +27,11 @@ func TagGet(c *gin.Context) {
 	if err != nil {
 		c.AbortWithStatus(http.StatusInternalServerError)
 	}
-
+	tags, _ := models.ListTag()
+	archives, _ := models.PostCountByArchives()
 	c.HTML(http.StatusOK, "index/index.html", gin.H{
-		"posts": posts,
+		"posts":    posts,
+		"tags":     tags,
+		"archives": archives,
 	})
 }

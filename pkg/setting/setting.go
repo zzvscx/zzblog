@@ -15,7 +15,8 @@ var (
 	ReadTimeout  time.Duration
 	WriteTimeout time.Duration
 
-	PageSize int
+	PageSize      int
+	SessionSecret string
 )
 
 func Setup() {
@@ -28,6 +29,7 @@ func Setup() {
 	LoadBase()
 	LoadServer()
 	LoadApp()
+	LoadSession()
 }
 
 func LoadBase() {
@@ -51,4 +53,12 @@ func LoadApp() {
 		log.Fatalf("Fail to get section 'app': %v", err)
 	}
 	PageSize = sec.Key("PAGE_SIZE").MustInt(10)
+}
+
+func LoadSession() {
+	sec, err := Cfg.GetSection("session")
+	if err != nil {
+		log.Fatalf("Fail to get section 'session': %v", err)
+	}
+	SessionSecret = sec.Key("SESSION_SECRET").MustString("")
 }

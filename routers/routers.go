@@ -1,6 +1,8 @@
 package routers
 
 import (
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"html/template"
 	"zzblog/pkg/setting"
@@ -11,11 +13,11 @@ import (
 func InitRouter() *gin.Engine {
 	r := gin.New()
 	setTemplate(r)
+	setSessions(r)
 	r.Static("/static", "./static")
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	gin.SetMode(setting.RunMode)
-
 	r.GET("/", views.IndexGet)
 	post := r.Group("/post")
 	{
@@ -26,7 +28,7 @@ func InitRouter() *gin.Engine {
 		post.POST("/edit/:id", views.PostUpdate)
 		post.POST("/delete/:id", views.PostDelete)
 	}
-	page := r.Group("page")
+	page := r.Group("/page")
 	{
 		page.GET("/", views.PageIndex)
 		page.GET("/new", views.PageNew)
@@ -39,7 +41,21 @@ func InitRouter() *gin.Engine {
 	tag := r.Group("/tag")
 	{
 		tag.POST("/new", views.TagCreate)
+		tag.GET("/:id", views.TagGet)
 	}
+	archives := r.Group("/archives")
+	{
+		archives.GET("/:year/:month", views.ArchiveGet)
+	}
+	user := r.Group("/user")
+	{
+		user.GET("/signin", views.SigninGet)
+		user.POST("/signin", views.SigninPost)
+		user.GET("/signup", views.SignupGet)
+		user.POST("/signup", views.SignupPost)
+		user.GET("/logout", views.LogoutGet)
+	}
+
 	return r
 }
 
@@ -52,4 +68,9 @@ func setTemplate(r *gin.Engine) {
 	}
 	r.FuncMap = funcMap
 	r.LoadHTMLGlob("template/**/*")
+}
+
+func setSessions(r *gin.Engine) {
+	store := cookie.NewStore([]byte(setting.SessionSecret))
+	r.Use(sessions.Sessions("mysession", store))
 }
